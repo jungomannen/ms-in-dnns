@@ -1,4 +1,5 @@
 venv
+my_venv
 credentials.json
 wandb_key.json
 *.pt
