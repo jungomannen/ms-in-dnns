@@ -21,7 +21,11 @@ def fit_poly(x_train, y_train, k=1):
 
 
 def mse_poly(x, y, W):
-    pass
+    fitted_poly = fit_poly(W)
+    fitted_y = fitted_poly(x)
+    squared_error = (y - fitted_y) * (y - fitted_y)
+    mse = np.average(squared_error)
+    return mse
 
 
 def create_polynomial(W):
@@ -34,7 +38,6 @@ def main():
     x_test_data, y_test_data = generate_data(10)
 
     W = fit_poly(x_training_data, y_training_data)
-    print(W)
 
     x_fitted_data = np.linspace(0, 2 * np.pi, 30)
     fitted_polynomial = create_polynomial(W)
