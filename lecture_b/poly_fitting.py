@@ -10,12 +10,22 @@ def generate_data(num):
     return (x, y)
 
 
-def fit_poly(x_train, y_train, k):
-    pass
+def fit_poly(x_train, y_train, k=1):
+    assert k == 1
+    # create design matrix X with added ones
+    X = np.stack((x_train, np.ones_like(x_train)), axis=1)
+
+    # compute weight matrix from formula
+    W = y_train @ X @ np.linalg.inv((np.transpose(X) @ X))
+    return W
 
 
 def mse_poly(x, y, W):
     pass
+
+
+def create_polynomial(W):
+    return lambda x: sum(w * pow(x, n) for n, w in enumerate(W))
 
 
 def main():
