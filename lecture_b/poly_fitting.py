@@ -38,11 +38,8 @@ def poly(x, W):
 
 def ridge_fit_poly(x_train, y_train, k, lamb):
     X = np.transpose(np.array([x_train**n for n in range(k + 1)]))  # detail matrix
-    return (
-        np.transpose(y_train)
-        @ X
-        @ np.linalg.inv(np.transpose(X) @ X + (lamb * np.eye(len(x_train))))
-    )
+    y_transpose = y_train.reshape((1, -1))  # convert to (1, N) array, i.e. transpose of y
+    return y_transpose @ X @ np.linalg.inv((np.transpose(X) @ X) + (lamb * np.eye(k + 1)))
 
 
 def perform_cv(x, y, k, lamb, folds):
@@ -114,7 +111,11 @@ def run_part_c():
 
 
 def run_part_d():
-    pass
+    x_train, y_train = generate_data(15, domain=(0, 4 * np.pi))
+    x_test, y_test = generate_data(10, domain=(0, 4 * np.pi))
+    W = ridge_fit_poly(x_train, y_train, 5, 1)
+    mse = mse_poly(x_test, y_test, W)
+    plot_poly_fitting(x_train, y_train, W, mse, (0, 4 * np.pi))
 
 
 def run_part_e():
@@ -122,8 +123,9 @@ def run_part_e():
 
 
 def main():
-    run_part_a_and_b()
-    run_part_c()
+    # run_part_a_and_b()
+    # run_part_c()
+    run_part_d()
 
 
 if __name__ == "__main__":
