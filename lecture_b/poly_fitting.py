@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 
 plt.style.use("_mpl-gallery")
 
@@ -112,10 +114,46 @@ def run_part_c():
 
 def run_part_d():
     x_train, y_train = generate_data(15, domain=(0, 4 * np.pi))
-    x_test, y_test = generate_data(10, domain=(0, 4 * np.pi))
-    W = ridge_fit_poly(x_train, y_train, 5, 1)
-    mse = mse_poly(x_test, y_test, W)
-    plot_poly_fitting(x_train, y_train, W, mse, (0, 4 * np.pi))
+    x_test, y_test = generate_data(1000, domain=(0, 4 * np.pi))
+    domain = (0, 4 * np.pi)
+
+    # test for k=5, lamb = 1
+    # W = ridge_fit_poly(x_train, y_train, 5, 1)
+    # mse = mse_poly(x_test, y_test, W)
+    # plot_poly_fitting(x_train, y_train, W, mse, domain)
+
+    # grid search tuning
+    k_values = list(range(1, 21))
+    lamb_values = 10 ** np.linspace(-5, 0, 20)
+    log10_mse_values = np.zeros((len(k_values), len(lamb_values)))
+    for i, k in enumerate(k_values):
+        for j, lamb in enumerate(lamb_values):
+            W_k_lamb = ridge_fit_poly(x_train, y_train, k, lamb)
+            log10_mse = np.log10(mse_poly(x_test, y_test, W_k_lamb))
+            log10_mse_values[i, j] = log10_mse
+
+    # best values found in grid search
+    best_k_index, best_lamb_index = np.unravel_index(
+        log10_mse_values.argmin(), log10_mse_values.shape
+    )
+    best_k = k_values[best_k_index]
+    best_lamb = lamb_values[best_lamb_index]
+    best_mse = 10 ** log10_mse_values[best_k_index, best_lamb_index]
+    best_W = ridge_fit_poly(x_train, y_train, best_k, best_lamb)
+    print(f"best k value = {best_k}, best lambda value = {best_lamb}, MSE={best_mse}")
+
+    # plot results
+    ax = plt.subplot()
+    im = ax.imshow(log10_mse_values)
+    plt.xlabel("lambda")
+    plt.ylabel("k")
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    plt.show()
+
+    # plot optimal polynomial from grid search
+    plot_poly_fitting(x_train, y_train, best_W, best_mse, domain)
 
 
 def run_part_e():
@@ -123,8 +161,8 @@ def run_part_e():
 
 
 def main():
-    # run_part_a_and_b()
-    # run_part_c()
+    run_part_a_and_b()
+    run_part_c()
     run_part_d()
 
 
