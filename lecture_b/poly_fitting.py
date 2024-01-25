@@ -45,7 +45,22 @@ def ridge_fit_poly(x_train, y_train, k, lamb):
 
 
 def perform_cv(x, y, k, lamb, folds):
-    pass
+    # split data
+    x_folds = np.split(x, folds)
+    y_folds = np.split(y, folds)
+
+    fold_mse = np.zeros(folds)
+    for n in range(folds):
+        # partition data
+        x_train = np.concatenate(x_folds[:n] + x_folds[n + 1 :])  # x with n:th fold removed
+        y_train = np.concatenate(y_folds[:n] + y_folds[n + 1 :])
+        x_test = x_folds[n]
+        y_test = y_folds[n]
+
+        # perform ridge regression
+        W = ridge_fit_poly(x_train, y_train, k, lamb)
+        fold_mse[n] = mse_poly(x_test, y_test, W)
+    return np.average(fold_mse)
 
 
 def plot_poly_fitting(x_train, y_train, W, mse, domain=None):
@@ -70,12 +85,10 @@ def plot_k_search(k_values, error_data):
     plt.plot(k_values, error_data)
     plt.xlabel("k")
     plt.ylabel("log10 MSE")
-
     plt.show()
 
 
 def run_part_a_and_b():
-    """part 2.a and 2.b"""
     # generate training and test data
     x_training_data, y_training_data = generate_data(15)
     x_test_data, y_test_data = generate_data(10)
@@ -91,7 +104,6 @@ def run_part_a_and_b():
 
 
 def run_part_c():
-    """part 2.c"""
     # create data
     x_training_data, y_training_data = generate_data(15, domain=(0, 4 * np.pi))
     x_test_data, y_test_data = generate_data(10, domain=(0, 4 * np.pi))
@@ -157,13 +169,15 @@ def run_part_d():
 
 
 def run_part_e():
-    pass
+    x_train, y_train = generate_data(100)
+    perform_cv(x_train, y_train, 8, 0.1, 10)
 
 
 def main():
-    run_part_a_and_b()
-    run_part_c()
-    run_part_d()
+    # run_part_a_and_b()
+    # run_part_c()
+    # run_part_d()
+    run_part_e()
 
 
 if __name__ == "__main__":
