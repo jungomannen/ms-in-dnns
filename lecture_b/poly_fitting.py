@@ -88,6 +88,40 @@ def plot_k_search(k_values, error_data):
     plt.show()
 
 
+def cv_hyperparameter_search(num, k_values, lamb_values, print_logs=True):
+    # generate data
+    x_train, y_train = generate_data(120)
+
+    # should probably create/find a function to compute this automatically...
+    assert num == 120
+    divisors = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60]
+
+    # grid search tuning to find best k, lamb
+    k_values = list(range(1, 21))
+    lamb_values = 10 ** np.linspace(-5, 0, 20)
+    mse_values = np.zeros((len(k_values), len(lamb_values)))
+    for i, k in enumerate(k_values):
+        if print_logs:
+            print(f"iteration {i} out of {len(k_values)}")
+        for j, lamb in enumerate(lamb_values):
+            # compute average mse over all number of folds
+            mse_estimate = 0.0
+            for divisor in divisors:
+                mse_k_lamb_div = perform_cv(x_train, y_train, k, lamb, divisor)
+                mse_estimate += mse_k_lamb_div
+            mse_estimate /= len(divisors)
+            mse_values[i, j] = mse_estimate
+
+    # best values found in grid search
+    best_k_index, best_lamb_index = np.unravel_index(mse_values.argmin(), mse_values.shape)
+    best_k = k_values[best_k_index]
+    best_lamb = lamb_values[best_lamb_index]
+    best_mse = mse_values[best_k_index, best_lamb_index]
+    if print_logs:
+        print(f"best k value = {best_k}, best lambda value = {best_lamb}, MSE={best_mse}")
+    return best_k, best_lamb
+
+
 def run_part_a_and_b():
     # generate training and test data
     x_training_data, y_training_data = generate_data(15)
@@ -169,16 +203,93 @@ def run_part_d():
 
 
 def run_part_e():
-    x_train, y_train = generate_data(100)
-    perform_cv(x_train, y_train, 8, 0.1, 10)
+    # do grid search to find best k, lamb
+    k_values = list(range(1, 21))
+    lamb_values = 10 ** np.linspace(-5, 0, 20)
+    # best_k, best_lamb = cv_hyperparameter_search(120, k_values, lamb_values)
 
+    # after running this once, I obtained:
+    # best k value = 5, best lambda value = 0.04832930238571752, MSE=0.03568612470276438
+    best_k = 5
+    best_lamb = 0.04832930238571752
 
-def main():
-    # run_part_a_and_b()
-    # run_part_c()
-    # run_part_d()
-    run_part_e()
+    # evaluate cross validation mse versus number of folds
+    divisors = [2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 30, 40, 60]  # divs of 120
+
+    mse_vals = np.zeros((100, len(divisors)))
+    for n in range(100):
+        print(f"iteration {n} out of 100")
+        x_data, y_data = generate_data(120)
+        for i, divisor in enumerate(divisors):
+            mse = perform_cv(x_data, y_data, best_k, best_lamb, divisor)
+            mse_vals[n, i] = mse
+
+    mse_means = np.average(mse_vals, axis=0)
+    mse_standard_deviations = np.std(mse_vals, axis=0)
+
+    # mse_means = np.array(
+    #     [
+    #         8.38757943e01,
+    #         1.44424719e00,
+    #         1.87242143e-01,
+    #         5.42201325e-02,
+    #         2.70221879e-02,
+    #         1.84092112e-02,
+    #         1.35707470e-02,
+    #         1.23971302e-02,
+    #         1.13834851e-02,
+    #         1.09232429e-02,
+    #         1.06711977e-02,
+    #         1.05291514e-02,
+    #         1.03977252e-02,
+    #         1.02986414e-02,
+    #     ]
+    # )
+    # mse_standard_deviations = np.array(
+    #     [
+    #         1.35617711e02,
+    #         1.81139183e00,
+    #         2.40226265e-01,
+    #         5.17609013e-02,
+    #         2.91175280e-02,
+    #         8.63809458e-03,
+    #         4.36642006e-03,
+    #         3.15609359e-03,
+    #         2.13211943e-03,
+    #         1.90491065e-03,
+    #         1.72336572e-03,
+    #         1.55280189e-03,
+    #         1.49772614e-03,
+    #         1.42360097e-03,
+    #     ]
+    # )
+
+    fig, ax = plt.subplots()
+    log10_mse_means = np.log10(mse_means)
+    upper_std = mse_means + mse_standard_deviations
+    lower_std = mse_means - mse_standard_deviations
+
+    # get rid of negative values
+    lower_std[lower_std < 0] = 0
+
+    log10_upper_std = np.log10(upper_std)
+    log10_lower_std = np.log10(lower_std)
+
+    (mse_line,) = ax.plot(divisors, log10_mse_means)
+    (upper_std_line,) = ax.plot(divisors, log10_upper_std)
+    (lower_std_line,) = ax.plot(divisors, log10_lower_std)
+
+    ax.legend(
+        [mse_line, upper_std_line, lower_std_line],
+        ["log10(MSE)", "log10(MSE + sigma)", "log10(MSE - sigma)"],
+    )
+    plt.xlabel("number of folds")
+    plt.ylabel("log10 mse")
+    plt.show()
 
 
 if __name__ == "__main__":
-    main()
+    run_part_a_and_b()
+    run_part_c()
+    run_part_d()
+    run_part_e()
