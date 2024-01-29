@@ -3,6 +3,7 @@ from torch import optim
 import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
+import math
 
 
 N_TRAIN = 15
@@ -51,7 +52,9 @@ def plot_data(
     plt.show()
 
 
-def run_part_a():
+def train_model(
+    x_train: torch.Tensor, y_train: torch.Tensor, lr: float, step_count: int = 100
+) -> (float, nn.Linear):
     x = featurize(x_train)
     model = nn.Linear(4, 1, bias=False)
     with torch.no_grad():
@@ -60,21 +63,39 @@ def run_part_a():
 
     targets = y_train.reshape((-1, 1))
 
-    sgd = optim.SGD(model.parameters(), lr=0.00001)
+    sgd = optim.SGD(model.parameters(), lr=lr)
 
     preds = model(x)
     loss = loss_func(preds, targets)
 
-    for i in range(100):
+    for i in range(step_count):
         loss.backward()
         sgd.step()
         sgd.zero_grad()
         preds = model(x)
         loss = loss_func(preds, targets)
 
-    final_pred = preds.detach()
+    # final_pred = preds.detach()
     final_loss = loss.item()
-    plot_data(x_train, y_train, final_pred, final_loss)
+    return final_loss, model
+
+
+def run_part_a():
+    # learning rate tuning
+    results = dict()  # dict of form MSE : model
+    learning_rates = 10 ** torch.arange(-15, 1, 0.1, dtype=float)
+    for lr in learning_rates:
+        res = train_model(x_train, y_train, lr.item())
+        if math.isnan(res[0]) or math.isinf(res[0]):
+            break
+        results[res[0]] = res[1]
+
+    # best model found during tuning
+    best_mse = min(results.keys())
+    best_model = results[best_mse]
+    best_preds = best_model(featurize(x_train)).detach()
+
+    plot_data(x_train, y_train, best_preds, best_mse)
 
 
 if __name__ == "__main__":
