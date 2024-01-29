@@ -35,7 +35,7 @@ def generate_polynomial(W: torch.Tensor) -> "function":
 
 
 def plot_data(
-    x_train: torch.Tensor, y_train: torch.Tensor, y_pred: torch.Tensor, final_loss: float
+    x_train: torch.Tensor, y_train: torch.Tensor, model: nn.Linear, final_loss: float
 ) -> None:
     x_true = torch.linspace(0, 2 * torch.pi, 200)
     y_true = torch.sin(x_true)
@@ -44,10 +44,14 @@ def plot_data(
     cf_poly = generate_polynomial(W_cf)
     y_cf_regression = cf_poly(x_true)
 
+    W_nn = model.weight.detach().reshape(-1)
+    nn_poly = generate_polynomial(W_nn)
+    y_nn_regression = nn_poly(x_true)
+
     plt.plot(x_true, y_true, label="ground truth")
     plt.scatter(x_train, y_train, label="training data")
     plt.plot(x_true, y_cf_regression, label="closed form regression")
-    plt.scatter(x_train, y_pred, label=f"SGD regression, MSE={final_loss}")
+    plt.plot(x_true, y_nn_regression, label=f"SGD regression, MSE={final_loss}")
 
     plt.legend()
     plt.show()
@@ -112,8 +116,7 @@ def run_part_a():
 
     best_model = model
     best_mse = loss
-    best_preds = best_model(featurize(x_train)).detach()
-    plot_data(x_train, y_train, best_preds, best_mse)
+    plot_data(x_train, y_train, best_model, best_mse)
 
 
 if __name__ == "__main__":
