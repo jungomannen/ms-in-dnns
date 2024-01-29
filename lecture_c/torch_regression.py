@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import matplotlib.pyplot as plt
 import math
+from argparse import Namespace
 
 
 N_TRAIN = 15
@@ -54,7 +55,7 @@ def plot_data(
 
 def train_model(
     x_train: torch.Tensor, y_train: torch.Tensor, lr: float, step_count: int = 100
-) -> (float, nn.Linear):
+) -> (nn.Linear, float):
     x = featurize(x_train)
     model = nn.Linear(4, 1, bias=False)
     with torch.no_grad():
@@ -77,24 +78,41 @@ def train_model(
 
     # final_pred = preds.detach()
     final_loss = loss.item()
-    return final_loss, model
+    return model, final_loss
 
 
 def run_part_a():
     # learning rate tuning
-    results = dict()  # dict of form MSE : model
+    results = dict()  # dict of form MSE : Namespace(model, lr, step_count)
     learning_rates = 10 ** torch.arange(-15, 1, 0.1, dtype=float)
     for lr in learning_rates:
-        res = train_model(x_train, y_train, lr.item())
-        if math.isnan(res[0]) or math.isinf(res[0]):
+        model, loss = train_model(x_train, y_train, lr.item())
+        if math.isnan(loss) or math.isinf(loss):
             break
-        results[res[0]] = res[1]
+        results[loss] = Namespace(model=model, lr=lr, step_count=100)
 
     # best model found during tuning
     best_mse = min(results.keys())
-    best_model = results[best_mse]
-    best_preds = best_model(featurize(x_train)).detach()
+    best_model = results[best_mse].model
+    best_lr = results[best_mse].lr.item()
+    # best_preds = best_model(featurize(x_train)).detach()
+    # print(best_lr)
 
+    # plot_data(x_train, y_train, best_preds, best_mse)
+
+    # loss vs step_count for tuned learning rate
+    step_counts = 10 ** torch.arange(1, 5, 1, dtype=float)
+    losses = torch.zeros_like(step_counts, dtype=float)
+    for i, step_count in enumerate(step_counts):
+        model, loss = train_model(x_train, y_train, best_lr, int(step_count))
+        losses[i] = loss
+    plt.plot(torch.log10(step_counts), torch.log10(losses), label="log10loss vs log10 step count")
+    plt.legend()
+    plt.show()
+
+    best_model = model
+    best_mse = loss
+    best_preds = best_model(featurize(x_train)).detach()
     plot_data(x_train, y_train, best_preds, best_mse)
 
 
