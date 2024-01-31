@@ -31,10 +31,12 @@ def cf_regression(x_train: torch.Tensor, y_train: torch.Tensor) -> torch.Tensor:
     return y_train @ X @ torch.linalg.inv(X.T @ X)
 
 
+# convert polynomial coefficients to a polynomial function
 def generate_polynomial(W: torch.Tensor) -> "function":
     return lambda x: W @ featurize(x).T
 
 
+# plot training data, ground truth, and model prediction
 def plot_data(
     x_train: torch.Tensor, y_train: torch.Tensor, model: nn.Linear, final_loss: float
 ) -> None:
@@ -66,7 +68,7 @@ def train_model(
     weight: torch.Tensor = None,
     momentum: float = 0,
     optimizer_type: str = None,
-) -> (nn.Linear, float):
+):
     # initialize NN
     if weight is None:
         weight = torch.ones(4)
@@ -92,19 +94,23 @@ def train_model(
     targets = y_train.reshape((-1, 1))
     loss = loss_func(preds, targets)
 
+    losses = torch.zeros(step_count)
+    step_counts = torch.arange(1, step_count + 1)
+
     # optimizer loop
-    for _ in range(step_count):
+    for i in step_counts:
         loss.backward()
         optimizer.step()
         optimizer.zero_grad()
         preds = model(x)
         loss = loss_func(preds, targets)
+        losses[i - 1] = loss.item()
 
     # results
-    final_loss = loss.item()
-    return model, final_loss
+    return model, losses
 
 
+# search a range of learning rates (and momentums) to find best model after 100 steps
 def lr_tuning(
     x_train: torch.Tensor,
     y_train: torch.Tensor,
@@ -118,11 +124,11 @@ def lr_tuning(
         momentums = torch.zeros(1, dtype=float)
 
     # learning rate (and momentum) tuning
-    results = dict()  # dict of form MSE : Namespace(model, lr, step_count)
+    results = dict()  # dict of form MSE : Namespace(model, lr, momentum)
     for lr, momentum in torch.cartesian_prod(learning_rates, momentums):
         # if momentum was set to None, the nested loops reduce to a loop only over lr's
         # if weight is set to None, the default [1, 1, 1, 1] is used
-        model, loss = train_model(
+        model, losses = train_model(
             x_train,
             y_train,
             lr=lr.item(),
@@ -130,18 +136,15 @@ def lr_tuning(
             momentum=momentum,
             optimizer_type=optimizer_type,
         )
-        # if math.isnan(loss) or math.isinf(loss):
-        #     break
-        results[loss] = Namespace(model=model, lr=lr, momentum=momentum, step_count=100)
+        loss = losses[-1]  # the loss for the current model
+        results[loss] = Namespace(model=model, lr=lr, momentum=momentum)
 
     # best model found during tuning
     best_mse = min(results.keys())
     best_model = results[best_mse].model
     best_lr = results[best_mse].lr.item()
     best_momentum = results[best_mse].momentum.item()
-    best_results = Namespace(
-        model=best_model, mse=best_mse, lr=best_lr, momentum=best_momentum, step_count=100
-    )
+    best_results = Namespace(model=best_model, mse=best_mse, lr=best_lr, momentum=best_momentum)
     return best_results
 
 
@@ -159,22 +162,18 @@ def run_part_a():
     # plot_data(x_train, y_train, best_model, best_mse)
 
     # loss vs step_count for tuned learning rate
-    step_counts = 10 ** torch.arange(1, 6, 1, dtype=float)
-    losses = torch.zeros_like(step_counts, dtype=float)
-    for i, step_count in enumerate(step_counts):
-        model, loss = train_model(x_train, y_train, best_lr, int(step_count))
-        losses[i] = loss
-    plt.plot(torch.log10(step_counts), torch.log10(losses), label="log10loss vs log10 step count")
+    STEP_COUNT = 2_000
+    model, losses = train_model(x_train, y_train, best_lr, STEP_COUNT)
+    plt.plot(torch.arange(100, STEP_COUNT + 1), losses[99:], label="loss vs step count")
+    plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
 
-    best_model = model
-    best_mse = loss
     # assert best_mse == 0.1106143668293953 ~ 0.05
-    plot_data(x_train, y_train, best_model, best_mse)
+    plot_data(x_train, y_train, model, losses[-1])
 
 
-def run_part_b():
+def run_part_b_momentum():
     # learning rate tuning for weight = [1, 0.1, 0.01, 0.001]
     learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
     momentums = 10 ** torch.linspace(-5, 5, 20, dtype=float)
@@ -192,30 +191,36 @@ def run_part_b():
     # assert best_lr == 6.812920690579622e-05
     # assert best_momentum == 0.01
 
-    plot_data(x_train, y_train, best_model, best_mse)
+    # plot_data(x_train, y_train, best_model, best_mse)
 
     # loss vs step_count for tuned learning rate
-    step_counts = 10 ** torch.arange(1, 6, 1, dtype=float)
-    losses = torch.zeros_like(step_counts, dtype=float)
-    for i, step_count in enumerate(step_counts):
-        model, loss = train_model(
-            x_train,
-            y_train,
-            lr=best_lr,
-            momentum=best_momentum,
-            step_count=int(step_count),
-            weight=weight,
-        )
-        losses[i] = loss
-    plt.plot(torch.log10(step_counts), torch.log10(losses), label="log10loss vs log10 step count")
+    STEP_COUNT = 2_000
+    model, losses = train_model(
+        x_train,
+        y_train,
+        lr=best_lr,
+        momentum=best_momentum,
+        step_count=STEP_COUNT,
+        weight=weight,
+    )
+    plt.plot(torch.arange(100, STEP_COUNT + 1), losses[99:], label="loss vs step count")
+    plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
 
     best_model = model
-    best_mse = loss  # ~ 0.03
+    best_mse = losses[-1]  # ~ 0.03
     plot_data(x_train, y_train, best_model, best_mse)
 
 
+def run_part_b_adam():
+    pass
+
+
+def run_part_b_bfgs():
+    pass
+
+
 if __name__ == "__main__":
-    run_part_a()
-    run_part_b()
+    # run_part_a()
+    run_part_b_momentum()
