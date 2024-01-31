@@ -158,23 +158,16 @@ def run_part_a(step_count: int = 2000):
     # learning rate tuning
     learning_rates = 10 ** torch.linspace(-15, 1, 160, dtype=float)
     tuning_results = lr_tuning(x_train, y_train, learning_rates)
-    best_mse = tuning_results.mse
-    best_model = tuning_results.model
-    best_lr = tuning_results.lr
 
-    # assert best_mse == 9.99654483795166
-    # assert best_lr == 5.851882501969502e-05
-
-    # plot_data(x_train, y_train, best_model, best_mse)
+    # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
 
     # loss vs step_count for tuned learning rate
-    model, losses = train_model(x_train, y_train, best_lr, step_count)
+    model, losses = train_model(x_train, y_train, tuning_results.lr, step_count)
     plt.plot(torch.arange(100, step_count + 1), losses[99:], label="loss vs step count")
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
 
-    # assert best_mse == 0.1106143668293953 ~ 0.05
     plot_data(x_train, y_train, model, losses[-1])
     print(f"SGD with no momentum (lr={tuning_results.lr}): MSE={losses[-1]}")
 
@@ -218,7 +211,6 @@ def run_part_b_momentum(step_count: int = 2000):
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
-    # best mse should be ~ 0.03
     plot_data(x_train, y_train, model, losses[-1])
     print(f"SGD (lr={tuning_results.lr}, momentum={tuning_results.momentum}): MSE={losses[-1]}")
 
@@ -252,7 +244,7 @@ def run_part_b_adam(step_count: int = 2000):
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
-    # best mse should be ~ 0.03
+
     plot_data(x_train, y_train, model, losses[-1])
     print(f"Adam (lr={tuning_results.lr}): MSE={losses[-1]}")
 
@@ -285,7 +277,7 @@ def run_part_b_lbfgs(step_count: int = 2000):
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
-    # best mse should be ~ 0.03
+
     plot_data(x_train, y_train, model, losses[-1])
     print(f"LBFGS (lr={tuning_results.lr}): MSE={losses[-1]}")
 
