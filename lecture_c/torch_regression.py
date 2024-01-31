@@ -5,6 +5,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import math
 from argparse import Namespace
+import sys
 
 
 N_TRAIN = 15
@@ -64,6 +65,7 @@ def train_model(
     step_count: int = 100,
     weight: torch.Tensor = None,
     momentum: float = 0,
+    optimizer_type: str = None,
 ) -> (nn.Linear, float):
     # initialize NN
     if weight is None:
@@ -73,21 +75,32 @@ def train_model(
     with torch.no_grad():
         model.weight[...] = weight[...]
 
-    loss_func = nn.MSELoss()
-    sgd = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+    # optimizer selection
+    if optimizer_type is None or optimizer_type == "SGD":
+        optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+    elif optimizer_type == "Adam":
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+    elif optimizer_type == "LBFGS":
+        optimizer = optim.LBFGS(model.parameters(), lr=lr)
+    else:
+        print("unknown optimizer", file=sys.stderr)
+        raise ValueError
 
+    # optimizer/loss setup
+    loss_func = nn.MSELoss()
     preds = model(x)
     targets = y_train.reshape((-1, 1))
     loss = loss_func(preds, targets)
 
+    # optimizer loop
     for _ in range(step_count):
         loss.backward()
-        sgd.step()
-        sgd.zero_grad()
+        optimizer.step()
+        optimizer.zero_grad()
         preds = model(x)
         loss = loss_func(preds, targets)
 
-    # final_pred = preds.detach()
+    # results
     final_loss = loss.item()
     return model, final_loss
 
@@ -96,36 +109,27 @@ def lr_tuning(
     x_train: torch.Tensor,
     y_train: torch.Tensor,
     learning_rates: torch.Tensor,
+    momentums: torch.Tensor = None,
     weight: torch.Tensor = None,
-) -> (float, nn.Linear, float):
-    # learning rate tuning
-    results = dict()  # dict of form MSE : Namespace(model, lr, step_count)
-    for lr in learning_rates:
-        # if weight is set to None, the default [1, 1, 1, 1] is used
-        model, loss = train_model(x_train, y_train, lr=lr.item(), weight=weight)
-        if math.isnan(loss) or math.isinf(loss):
-            break
-        results[loss] = Namespace(model=model, lr=lr, step_count=100)
+    optimizer_type: str = None,
+) -> Namespace:
+    # if no momentum is specified, use momentum=0
+    if momentums is None:
+        momentums = torch.zeros(1, dtype=float)
 
-    # best model found during tuning
-    best_mse = min(results.keys())
-    best_model = results[best_mse].model
-    best_lr = results[best_mse].lr.item()
-    return best_mse, best_model, best_lr
-
-
-def lr_momentum_tuning(
-    x_train: torch.Tensor,
-    y_train: torch.Tensor,
-    learning_rates: torch.Tensor,
-    momentums: torch.Tensor,
-    weight: torch.Tensor = None,
-) -> (float, nn.Linear, float, float):
-    # learning rate tuning
+    # learning rate (and momentum) tuning
     results = dict()  # dict of form MSE : Namespace(model, lr, step_count)
     for lr, momentum in torch.cartesian_prod(learning_rates, momentums):
+        # if momentum was set to None, the nested loops reduce to a loop only over lr's
         # if weight is set to None, the default [1, 1, 1, 1] is used
-        model, loss = train_model(x_train, y_train, lr=lr.item(), weight=weight, momentum=momentum)
+        model, loss = train_model(
+            x_train,
+            y_train,
+            lr=lr.item(),
+            weight=weight,
+            momentum=momentum,
+            optimizer_type=optimizer_type,
+        )
         # if math.isnan(loss) or math.isinf(loss):
         #     break
         results[loss] = Namespace(model=model, lr=lr, momentum=momentum, step_count=100)
@@ -135,13 +139,19 @@ def lr_momentum_tuning(
     best_model = results[best_mse].model
     best_lr = results[best_mse].lr.item()
     best_momentum = results[best_mse].momentum.item()
-    return best_mse, best_model, best_lr, best_momentum
+    best_results = Namespace(
+        model=best_model, mse=best_mse, lr=best_lr, momentum=best_momentum, step_count=100
+    )
+    return best_results
 
 
 def run_part_a():
     # learning rate tuning
     learning_rates = 10 ** torch.linspace(-15, 1, 160, dtype=float)
-    best_mse, best_model, best_lr = lr_tuning(x_train, y_train, learning_rates)
+    tuning_results = lr_tuning(x_train, y_train, learning_rates)
+    best_mse = tuning_results.mse
+    best_model = tuning_results.model
+    best_lr = tuning_results.lr
 
     # assert best_mse == 9.99654483795166
     # assert best_lr == 5.851882501969502e-05
@@ -169,9 +179,14 @@ def run_part_b():
     learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
     momentums = 10 ** torch.linspace(-5, 5, 20, dtype=float)
     weight = torch.tensor([1.0, 0.1, 0.01, 0.001])
-    best_mse, best_model, best_lr, best_momentum = lr_momentum_tuning(
-        x_train, y_train, learning_rates, momentums, weight
+
+    tuning_results = lr_tuning(
+        x_train, y_train, learning_rates=learning_rates, momentums=momentums, weight=weight
     )
+    best_mse = tuning_results.mse
+    best_model = tuning_results.model
+    best_lr = tuning_results.lr
+    best_momentum = tuning_results.momentum
 
     # assert best_mse == 0.5352210998535156
     # assert best_lr == 6.812920690579622e-05
