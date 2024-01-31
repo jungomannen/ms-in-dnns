@@ -288,3 +288,8 @@ if __name__ == "__main__":
     run_part_b_momentum(STEP_COUNT)
     run_part_b_adam(STEP_COUNT)
     # run_part_b_lbfgs(STEP_COUNT)
+
+    # for STEP_COUNT = 3000, i got the following results:
+    # SGD with no momentum (lr=5.851882501969502e-05): MSE=0.22845959663391113
+    # SGD (lr=8.886238162743407e-05, momentum=0.5455594781168516): MSE=0.17118191719055176
+    # Adam (lr=0.01): MSE=0.024429602548480034
