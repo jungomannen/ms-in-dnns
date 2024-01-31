@@ -148,7 +148,13 @@ def lr_tuning(
     return best_results
 
 
-def run_part_a():
+def run_part_a(step_count: int = 2000):
+    """
+    This function performs the following tasks:
+    1. Finds a good learning rate (after 100 steps of SGD), with weight = [1,1,1,1]
+    2. Plots the loss vs step count for SGD with that learning rate (still weight = [1,1,1,1])
+    """
+
     # learning rate tuning
     learning_rates = 10 ** torch.linspace(-15, 1, 160, dtype=float)
     tuning_results = lr_tuning(x_train, y_train, learning_rates)
@@ -162,65 +168,131 @@ def run_part_a():
     # plot_data(x_train, y_train, best_model, best_mse)
 
     # loss vs step_count for tuned learning rate
-    STEP_COUNT = 2_000
-    model, losses = train_model(x_train, y_train, best_lr, STEP_COUNT)
-    plt.plot(torch.arange(100, STEP_COUNT + 1), losses[99:], label="loss vs step count")
+    model, losses = train_model(x_train, y_train, best_lr, step_count)
+    plt.plot(torch.arange(100, step_count + 1), losses[99:], label="loss vs step count")
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
 
     # assert best_mse == 0.1106143668293953 ~ 0.05
     plot_data(x_train, y_train, model, losses[-1])
+    print(f"SGD with no momentum (lr={tuning_results.lr}): MSE={losses[-1]}")
 
 
-def run_part_b_momentum():
+def run_part_b_momentum(step_count: int = 2000):
+    """
+    This function performs the following tasks:
+    1. Finds a good learning rate and momentum (after 100 steps of SGD),
+    with weight = [1,0.1,0.01,0.01]
+    2. Plots the loss vs step count for SGD with that learning rate and momentum
+    (still weight = [1,0.1,0.01,0.01])
+    """
+
     # learning rate tuning for weight = [1, 0.1, 0.01, 0.001]
     learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
     momentums = 10 ** torch.linspace(-5, 5, 20, dtype=float)
     weight = torch.tensor([1.0, 0.1, 0.01, 0.001])
 
     tuning_results = lr_tuning(
-        x_train, y_train, learning_rates=learning_rates, momentums=momentums, weight=weight
+        x_train,
+        y_train,
+        learning_rates=learning_rates,
+        momentums=momentums,
+        weight=weight,
+        optimizer_type="SGD",
     )
-    best_mse = tuning_results.mse
-    best_model = tuning_results.model
-    best_lr = tuning_results.lr
-    best_momentum = tuning_results.momentum
 
-    # assert best_mse == 0.5352210998535156
-    # assert best_lr == 6.812920690579622e-05
-    # assert best_momentum == 0.01
-
-    # plot_data(x_train, y_train, best_model, best_mse)
+    # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
 
     # loss vs step_count for tuned learning rate
-    STEP_COUNT = 2_000
     model, losses = train_model(
         x_train,
         y_train,
-        lr=best_lr,
-        momentum=best_momentum,
-        step_count=STEP_COUNT,
+        lr=tuning_results.lr,
+        momentum=tuning_results.momentum,
+        step_count=step_count,
         weight=weight,
+        optimizer_type="SGD",
     )
-    plt.plot(torch.arange(100, STEP_COUNT + 1), losses[99:], label="loss vs step count")
+    plt.plot(torch.arange(100, step_count + 1), losses[99:], label="loss vs step count")
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
-
-    best_model = model
-    best_mse = losses[-1]  # ~ 0.03
-    plot_data(x_train, y_train, best_model, best_mse)
-
-
-def run_part_b_adam():
-    pass
+    # best mse should be ~ 0.03
+    plot_data(x_train, y_train, model, losses[-1])
+    print(f"SGD (lr={tuning_results.lr}, momentum={tuning_results.momentum}): MSE={losses[-1]}")
 
 
-def run_part_b_bfgs():
-    pass
+def run_part_b_adam(step_count: int = 2000):
+    # learning rate tuning for weight = [1, 0.1, 0.01, 0.001]
+    learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
+    weight = torch.tensor([1.0, 0.1, 0.01, 0.001])
+
+    tuning_results = lr_tuning(
+        x_train,
+        y_train,
+        learning_rates=learning_rates,
+        weight=weight,
+        optimizer_type="Adam",
+    )
+
+    # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
+
+    # loss vs step_count for tuned learning rate
+    step_count = 2_000
+    model, losses = train_model(
+        x_train,
+        y_train,
+        lr=tuning_results.lr,
+        step_count=step_count,
+        weight=weight,
+        optimizer_type="Adam",
+    )
+    plt.plot(torch.arange(100, step_count + 1), losses[99:], label="loss vs step count")
+    plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
+    plt.legend()
+    plt.show()
+    # best mse should be ~ 0.03
+    plot_data(x_train, y_train, model, losses[-1])
+    print(f"Adam (lr={tuning_results.lr}): MSE={losses[-1]}")
+
+
+def run_part_b_lbfgs(step_count: int = 2000):
+    # learning rate tuning for weight = [1, 0.1, 0.01, 0.001]
+    learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
+    weight = torch.tensor([1.0, 0.1, 0.01, 0.001])
+
+    tuning_results = lr_tuning(
+        x_train,
+        y_train,
+        learning_rates=learning_rates,
+        weight=weight,
+        optimizer_type="LBFGS",
+    )
+
+    # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
+
+    # loss vs step_count for tuned learning rate
+    model, losses = train_model(
+        x_train,
+        y_train,
+        lr=tuning_results.lr,
+        step_count=step_count,
+        weight=weight,
+        optimizer_type="LBFGS",
+    )
+    plt.plot(torch.arange(100, step_count + 1), losses[99:], label="loss vs step count")
+    plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
+    plt.legend()
+    plt.show()
+    # best mse should be ~ 0.03
+    plot_data(x_train, y_train, model, losses[-1])
+    print(f"LBFGS (lr={tuning_results.lr}): MSE={losses[-1]}")
 
 
 if __name__ == "__main__":
-    # run_part_a()
-    run_part_b_momentum()
+    STEP_COUNT = 3000
+    run_part_a(STEP_COUNT)
+    run_part_b_momentum(STEP_COUNT)
+    run_part_b_adam(STEP_COUNT)
+    # run_part_b_lbfgs(STEP_COUNT)
