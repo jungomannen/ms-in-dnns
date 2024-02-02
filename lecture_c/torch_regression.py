@@ -98,13 +98,26 @@ def train_model(
     step_counts = torch.arange(1, step_count + 1)
 
     # optimizer loop
-    for i in step_counts:
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        preds = model(x)
-        loss = loss_func(preds, targets)
-        losses[i - 1] = loss.item()
+    if optimizer_type == "LBFGS":
+        for i in step_counts:
+
+            def closure():
+                optimizer.zero_grad()
+                preds = model(x)
+                loss = loss_func(preds, targets)
+                losses[i - 1] = loss.detach().item()
+                loss.backward()
+                return loss
+
+            optimizer.step(closure)
+    else:
+        for i in step_counts:
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            preds = model(x)
+            loss = loss_func(preds, targets)
+            losses[i - 1] = loss.detach().item()
 
     # results
     return model, losses
@@ -160,6 +173,26 @@ def run_part_a(step_count: int = 2000):
     tuning_results = lr_tuning(x_train, y_train, learning_rates)
 
     # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
+
+    # loss vs step_count for too low learning rate
+    LOW_LR_STEP_COUNT = 2000
+    model, losses = train_model(x_train, y_train, 0.1 * tuning_results.lr, LOW_LR_STEP_COUNT)
+    plt.plot(
+        torch.arange(100, LOW_LR_STEP_COUNT + 1),
+        losses[99:],
+        label="loss vs step count with too low lr",
+    )
+    plt.legend()
+    plt.show()
+
+    # loss vs step_count for too high learning rate
+    HIGH_LR_STEP_COUNT = 100
+    model, losses = train_model(x_train, y_train, 1.5 * tuning_results.lr, HIGH_LR_STEP_COUNT)
+    plt.plot(
+        torch.arange(1, HIGH_LR_STEP_COUNT + 1), losses, label="loss vs step count with too high lr"
+    )
+    plt.legend()
+    plt.show()
 
     # loss vs step_count for tuned learning rate
     model, losses = train_model(x_train, y_train, tuning_results.lr, step_count)
@@ -231,7 +264,6 @@ def run_part_b_adam(step_count: int = 2000):
     # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
 
     # loss vs step_count for tuned learning rate
-    step_count = 2_000
     model, losses = train_model(
         x_train,
         y_train,
@@ -249,18 +281,24 @@ def run_part_b_adam(step_count: int = 2000):
     print(f"Adam (lr={tuning_results.lr}): MSE={losses[-1]}")
 
 
-def run_part_b_lbfgs(step_count: int = 2000):
-    # learning rate tuning for weight = [1, 0.1, 0.01, 0.001]
-    learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
+def run_part_b_lbfgs(
+    step_count: int = 2000, tune_lr: bool = False, lr: float = 0.0074438030132516885
+):
     weight = torch.tensor([1.0, 0.1, 0.01, 0.001])
 
-    tuning_results = lr_tuning(
-        x_train,
-        y_train,
-        learning_rates=learning_rates,
-        weight=weight,
-        optimizer_type="LBFGS",
-    )
+    # learning rate tuning for weight = [1, 0.1, 0.01, 0.001]
+    if tune_lr:
+        learning_rates = 10 ** torch.linspace(-7, -2, 40, dtype=float)
+
+        tuning_results = lr_tuning(
+            x_train,
+            y_train,
+            learning_rates=learning_rates,
+            weight=weight,
+            optimizer_type="LBFGS",
+        )
+    else:
+        tuning_results = Namespace(lr=lr)
 
     # plot_data(x_train, y_train, tuning_results.model, tuning_results.mse)
 
@@ -273,7 +311,7 @@ def run_part_b_lbfgs(step_count: int = 2000):
         weight=weight,
         optimizer_type="LBFGS",
     )
-    plt.plot(torch.arange(100, step_count + 1), losses[99:], label="loss vs step count")
+    plt.plot(torch.arange(1, step_count + 1), losses, label="loss vs step count")
     plt.axhline(y=losses[-1], color="r", linestyle="dashed", label="final loss")
     plt.legend()
     plt.show()
@@ -283,13 +321,22 @@ def run_part_b_lbfgs(step_count: int = 2000):
 
 
 if __name__ == "__main__":
-    STEP_COUNT = 3000
+    STEP_COUNT = 100
     run_part_a(STEP_COUNT)
     run_part_b_momentum(STEP_COUNT)
     run_part_b_adam(STEP_COUNT)
-    # run_part_b_lbfgs(STEP_COUNT)
+    run_part_b_adam(2452)  # runs adam to the first lossy spike
+    run_part_b_lbfgs(100)  # LBFGS converges after only ~ 50 steps
 
-    # for STEP_COUNT = 3000, i got the following results:
-    # SGD with no momentum (lr=5.851882501969502e-05): MSE=0.22845959663391113
-    # SGD (lr=8.886238162743407e-05, momentum=0.5455594781168516): MSE=0.17118191719055176
-    # Adam (lr=0.01): MSE=0.024429602548480034
+# for STEP_COUNT = 3000, i got the following results:
+# SGD with no momentum (lr=5.851882501969502e-05): MSE=0.22845959663391113
+# SGD (lr=8.886238162743407e-05, momentum=0.5455594781168516): MSE=0.17118191719055176
+# Adam (lr=0.01): MSE=0.024429602548480034
+
+# for STEP_COUNT = 5000, i got the following results:
+# SGD with no momentum (lr=5.851882501969502e-05): MSE=0.12421460449695587
+# SGD (lr=8.886238162743407e-05, momentum=0.5455594781168516): MSE=0.15741923451423645
+# Adam (lr=0.01): MSE=0.012152064591646194
+
+# for LBFGS with STEP_COUNT=100, i got the following results:
+# LBFGS (lr=0.0074438030132516885): MSE=0.012150166556239128
